@@ -1,0 +1,41 @@
+[project]
+name = "mcp-book"
+version = "0.1.0"
+description = "MCP server to search and read a personal library of PDF books, passage by passage"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=2.0,<3",
+    "pymupdf>=1.25",
+    "pdfplumber>=0.11",
+    "sqlite-vec>=0.1.9",
+    "numpy>=1.26",
+    "sentence-transformers>=3.0",
+]
+
+[project.scripts]
+mcp-book = "mcp_book.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_book"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

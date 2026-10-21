@@ -1,0 +1,36 @@
+# Relative paths are resolved from this file's directory.
+
+[library]
+pdf_dir = "library"
+index_dir = "data"
+
+[embedding]
+# "sentence-transformers" (default), "none" (BM25 only) or "hash" (tests only)
+backend = "sentence-transformers"
+model = "BAAI/bge-m3"
+device = "cpu"
+batch_size = 16
+# Leave empty for automatic prefixes ("query: " / "passage: " for e5 models)
+query_prefix = ""
+passage_prefix = ""
+
+[chunking]
+target_tokens = 650
+max_tokens = 800
+overlap_tokens = 100
+
+[ingest]
+ocr = true
+ocr_languages = "ita+eng"
+ocr_min_chars = 25
+ocr_dpi = 300
+extract_tables = true
+
+[search]
+top_k = 8
+candidates = 50
+rrf_k = 60
+
+[server]
+host = "127.0.0.1"
+port = 8765
