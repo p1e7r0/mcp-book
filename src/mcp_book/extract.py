@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 TEXT_FLAGS = pymupdf.TEXT_DEHYPHENATE | pymupdf.TEXT_PRESERVE_WHITESPACE
 JUNK_TITLE = re.compile(r"^(untitled|microsoft word\b|document\d*$)|\.(docx?|indd|pdf)$", re.I)
 HYPHENATED_LINE_END = re.compile(r"(?<=[^\W\d_])[-\u00ad\u2010]$")
+PAGE_LABEL_TITLE = re.compile(r"^(\d+|[ivxlcdm]+)$", re.I)
 
 
 class OcrUnavailableError(RuntimeError):
@@ -25,7 +26,13 @@ def extract_book(path: Path, config: IngestConfig) -> ExtractedBook:
     with pymupdf.open(path) as document:
         metadata = read_metadata(path, document)
         toc = read_toc(document)
+        labels = outline_page_labels(toc, document.page_count)
+        if labels:
+            logger.info("%s: the outline holds page numbers, not chapters", path.name)
+            toc = []
         pages = [extract_page(page, config) for page in document]
+    for page in pages:
+        page.label = page.label or labels.get(page.page)
     tables = extract_tables(path) if config.extract_tables else []
     return ExtractedBook(metadata=metadata, pages=pages, toc=toc, tables=tables)
 
@@ -63,6 +70,19 @@ def join_lines(lines: list[str]) -> str:
         else:
             text = f"{text}\n{line}" if text else line
     return text
+
+
+def outline_page_labels(entries: list[TocEntry], page_count: int) -> dict[int, str]:
+    pages = {entry.page for entry in entries}
+    labels = {entry.page: entry.title for entry in entries if PAGE_LABEL_TITLE.match(entry.title)}
+    if (
+        len(entries) >= 0.8 * page_count
+        and len(pages) == len(entries)
+        and all(entry.level == 1 for entry in entries)
+        and len(labels) >= 0.8 * len(entries)
+    ):
+        return labels
+    return {}
 
 
 def _blocks_to_text(blocks: list[tuple]) -> str:

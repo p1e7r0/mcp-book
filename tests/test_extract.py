@@ -59,6 +59,20 @@ def test_sidecar_overrides_metadata(tmp_path: Path) -> None:
     assert book.metadata.author == "Anna Bianchi"
 
 
+def test_outline_of_page_numbers_becomes_page_labels(tmp_path: Path) -> None:
+    titles = ["cover1", "i", "ii", "1", "2", "3", "4", "5", "6", "7"]
+    document = pymupdf.open()
+    for title in titles:
+        document.new_page().insert_text((60, 70), f"Pagina {title}")
+    document.set_toc([[1, title, page] for page, title in enumerate(titles, start=1)])
+    document.save(tmp_path / "scansione.pdf")
+
+    book = extract_book(tmp_path / "scansione.pdf", IngestConfig(ocr=False, extract_tables=False))
+
+    assert book.toc == []
+    assert [page.label for page in book.pages] == [None, *titles[1:]]
+
+
 def test_line_end_hyphenation_is_joined(tmp_path: Path) -> None:
     document = pymupdf.open()
     page = document.new_page(width=595, height=842)

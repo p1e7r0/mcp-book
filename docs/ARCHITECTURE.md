@@ -81,6 +81,9 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
 - **Pages are 1-based PDF page indexes** in every tool argument. The printed
   label (`page_label`) is returned too and used in citations when it exists, so
   the citation matches the paper book.
+- **Outlines of page numbers**: scanned books often carry an outline with one flat
+  entry per page titled with the printed number ("12", "xi"). When most entries
+  look like that, the outline is read as page labels instead of chapters.
 - **`read_pages` clamps** to 10 pages and returns `truncated` + `next_start_page`
   instead of failing, so the assistant can keep reading.
 - **Book metadata** comes from the PDF; a sidecar `<file>.toml` next to the PDF
