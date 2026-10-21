@@ -6,15 +6,15 @@ from mcp_book.config import IngestConfig
 from mcp_book.extract import extract_book
 from mcp_book.margins import merge_variants, running_key
 
-CHAPTERS = {range(1, 6): "SALSE", range(7, 12): "COTTURE"}
+CHAPTERS = {range(1, 8): "SALSE", range(9, 16): "COTTURE"}
 
 
 def build_scanned_book(path: Path, *, toc: list[list] | None = None) -> Path:
     document = pymupdf.open()
-    for number in range(1, 13):
+    for number in range(1, 17):
         page = document.new_page(width=595, height=842)
         page.insert_text((60, 100), f"Testo della pagina {number} con una ricetta.", fontsize=11)
-        footer = "MANUALE DI PROVA"
+        footer = "MANUALE DI PROVA" if number <= 10 else "MANUALE DI"
         if number % 2:
             footer = next((title for pages, title in CHAPTERS.items() if number in pages), footer)
         if number == 3:
@@ -36,7 +36,7 @@ def test_running_footers_become_chapters_and_leave_the_text(tmp_path: Path) -> N
 
     assert [(entry.level, entry.title, entry.page) for entry in book.toc] == [
         (1, "Salse", 1),
-        (1, "Cotture", 7),
+        (1, "Cotture", 9),
     ]
     assert book.pages[0].text == "Testo della pagina 1 con una ricetta."
     assert book.pages[3].text == "Testo della pagina 4 con una ricetta.\n\nNota a margine unica"
@@ -57,7 +57,7 @@ def test_ocr_variants_of_a_running_line_are_merged() -> None:
 
 
 def test_outline_wins_over_running_footers(tmp_path: Path) -> None:
-    toc = [[1, "Le salse madri", 1], [1, "Le cotture", 7]]
+    toc = [[1, "Le salse madri", 1], [1, "Le cotture", 9]]
     pdf = build_scanned_book(tmp_path / "libro.pdf", toc=toc)
 
     book = extract_book(pdf, IngestConfig(ocr=False, extract_tables=False))

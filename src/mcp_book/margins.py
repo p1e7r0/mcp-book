@@ -101,6 +101,13 @@ def remove_running_lines(parts: list[PageParts]) -> tuple[list[PageText], list[T
         ]
         if len(overlapping) >= 2:
             book_level.add(key)
+    book_level |= {
+        key
+        for key in repeated
+        if any(
+            other != key and (other.startswith(key) or other.endswith(key)) for other in book_level
+        )
+    }
 
     chapter_keys = sorted(repeated - book_level, key=spans.get)
     if len(chapter_keys) < 2:
