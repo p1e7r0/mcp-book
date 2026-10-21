@@ -92,6 +92,18 @@ def test_back_of_book_index_pages_are_not_chunked() -> None:
     assert [(chunk.page_start, chunk.page_end) for chunk in chunks] == [(1, 1)]
 
 
+def test_printed_contents_pages_are_not_chunked() -> None:
+    contents = "\n".join(f"Ricetta numero {index} {'.' * 30} {index * 7}" for index in range(1, 7))
+    pages = [
+        PageText(page=1, text=contents),
+        PageText(page=2, text="Riso fritto cantonese. Scaldare il grasso di pollo... poi il riso."),
+    ]
+
+    chunks = chunk_book(pages, [], ChunkingConfig())
+
+    assert [(chunk.page_start, chunk.page_end) for chunk in chunks] == [(2, 2)]
+
+
 def test_custom_token_counter_is_used() -> None:
     pages = [PageText(page=1, text=sentences(10))]
 
