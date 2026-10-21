@@ -40,6 +40,7 @@ class IngestConfig:
     ocr_min_chars: int = 25
     ocr_dpi: int = 300
     extract_tables: bool = True
+    layout: bool = True
 
 
 @dataclass

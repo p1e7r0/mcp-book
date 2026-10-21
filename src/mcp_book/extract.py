@@ -8,6 +8,7 @@ from pathlib import Path
 import pymupdf
 
 from mcp_book.config import IngestConfig
+from mcp_book.layout import Box, Line, layout_boxes, reading_order, text_lines
 from mcp_book.margins import PageParts, join_parts, remove_running_lines
 from mcp_book.models import BookMetadata, ExtractedBook, PageText, Table, TocEntry
 
@@ -41,7 +42,8 @@ def extract_book(path: Path, config: IngestConfig) -> ExtractedBook:
         if labels:
             logger.info("%s: the outline holds page numbers, not chapters", path.name)
             toc = []
-        parts = [extract_page_parts(page, config) for page in document]
+        boxes = layout_boxes(document) if config.layout else {}
+        parts = [extract_page_parts(page, config, boxes.get(page.number + 1)) for page in document]
     for part in parts:
         part.page.label = part.page.label or labels.get(part.page.page)
     pages, running_chapters = remove_running_lines(parts)
@@ -100,44 +102,36 @@ def outline_page_labels(entries: list[TocEntry], page_count: int) -> dict[int, s
     return {}
 
 
-def _blocks_to_text(blocks: list[tuple]) -> str:
-    paragraphs = []
-    for block in blocks:
-        if block[6] != 0:
-            continue
-        lines = [line.rstrip() for line in block[4].splitlines()]
-        paragraph = join_lines([line for line in lines if line.strip()])
-        if paragraph:
-            paragraphs.append(paragraph)
-    return "\n\n".join(paragraphs)
+def _paragraphs_to_text(groups: list[list[Line]]) -> str:
+    paragraphs = [join_lines([line.text for line in group]) for group in groups]
+    return "\n\n".join(paragraph for paragraph in paragraphs if paragraph)
 
 
-def _block_lines(blocks: list[tuple]) -> list[str]:
-    return [line.strip() for block in blocks for line in block[4].splitlines() if line.strip()]
-
-
-def split_margins(blocks: list[tuple], height: float) -> tuple[list[str], str, list[str]]:
+def split_margins(groups: list[list[Line]], height: float) -> tuple[list[str], str, list[str]]:
     header, body, footer = [], [], []
-    for block in blocks:
-        if block[6] != 0:
-            continue
-        if block[3] <= MARGIN * height:
-            header.append(block)
-        elif block[1] >= (1 - MARGIN) * height:
-            footer.append(block)
-        else:
-            body.append(block)
-    return _block_lines(header), _blocks_to_text(body), _block_lines(footer)
+    for group in groups:
+        kept = []
+        for line in group:
+            if line.y1 <= MARGIN * height:
+                header.append(line.text.strip())
+            elif line.y0 >= (1 - MARGIN) * height:
+                footer.append(line.text.strip())
+            else:
+                kept.append(line)
+        if kept:
+            body.append(kept)
+    return header, _paragraphs_to_text(body), footer
 
 
 def _length(header: list[str], body: str, footer: list[str]) -> int:
     return len(body.strip()) + sum(len(line) for line in header + footer)
 
 
-def extract_page_parts(page: pymupdf.Page, config: IngestConfig) -> PageParts:
-    header, body, footer = split_margins(
-        page.get_text("blocks", flags=TEXT_FLAGS), page.rect.height
-    )
+def extract_page_parts(
+    page: pymupdf.Page, config: IngestConfig, boxes: list[Box] | None = None
+) -> PageParts:
+    groups = reading_order(text_lines(page, TEXT_FLAGS), boxes)
+    header, body, footer = split_margins(groups, page.rect.height)
     used_ocr = False
     if config.ocr and _length(header, body, footer) < config.ocr_min_chars:
         try:
@@ -165,13 +159,8 @@ def ocr_page(page: pymupdf.Page, config: IngestConfig) -> tuple[list[str], str, 
         raise OcrUnavailableError(
             f"Tesseract not available or language data missing: {error}"
         ) from error
-    blocks = page.get_text("blocks", textpage=textpage, flags=TEXT_FLAGS)
-    header, body, footer = split_margins(blocks, page.rect.height)
-    return (
-        drop_ocr_noise("\n".join(header)).splitlines(),
-        drop_ocr_noise(body),
-        drop_ocr_noise("\n".join(footer)).splitlines(),
-    )
+    groups = drop_ocr_noise_lines(text_lines(page, TEXT_FLAGS, textpage))
+    return split_margins(reading_order(groups), page.rect.height)
 
 
 def _clean_number(number: str) -> str:
@@ -196,9 +185,7 @@ def is_text_line(line: str) -> bool:
     return len(words) >= 2 and sum(len(word) for word in words) >= 0.6 * visible
 
 
-def drop_ocr_noise(text: str) -> str:
-    paragraphs = [paragraph.splitlines() for paragraph in text.split("\n\n")]
-    lines = [line for paragraph in paragraphs for line in paragraph]
+def kept_ocr_lines(lines: list[str]) -> list[bool]:
     strong = [is_text_line(line) for line in lines]
     kept = []
     for index, line in enumerate(lines):
@@ -206,7 +193,12 @@ def drop_ocr_noise(text: str) -> str:
         following = strong[index + 1] if index + 1 < len(lines) else True
         weak = any(character.isalnum() for character in line) and previous and following
         kept.append(strong[index] or weak)
+    return kept
 
+
+def drop_ocr_noise(text: str) -> str:
+    paragraphs = [paragraph.splitlines() for paragraph in text.split("\n\n")]
+    kept = kept_ocr_lines([line for paragraph in paragraphs for line in paragraph])
     cleaned, position = [], 0
     for paragraph in paragraphs:
         kept_lines = [line for offset, line in enumerate(paragraph) if kept[position + offset]]
@@ -214,6 +206,12 @@ def drop_ocr_noise(text: str) -> str:
         if kept_lines:
             cleaned.append("\n".join(kept_lines))
     return "\n\n".join(cleaned)
+
+
+def drop_ocr_noise_lines(groups: list[list[Line]]) -> list[list[Line]]:
+    kept = iter(kept_ocr_lines([line.text for group in groups for line in group]))
+    cleaned = [[line for line in group if next(kept)] for group in groups]
+    return [group for group in cleaned if group]
 
 
 def extract_tables(path: Path) -> list[Table]:

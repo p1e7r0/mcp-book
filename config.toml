@@ -27,6 +27,7 @@ ocr_languages = "ita+eng"
 ocr_min_chars = 25
 ocr_dpi = 300
 extract_tables = true
+layout = true
 
 [search]
 top_k = 8

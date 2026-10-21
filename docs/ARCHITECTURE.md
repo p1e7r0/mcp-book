@@ -19,6 +19,7 @@ mcp-book/
 │   ├── models.py           # dataclasses shared by every stage
 │   ├── citation.py         # "Title, Chapter, p. N"
 │   ├── extract.py          # PDF → pages (text or OCR), TOC, tables, metadata
+│   ├── layout.py           # reading order: layout boxes, side-by-side columns
 │   ├── margins.py          # running headers/footers: removed, read as chapters
 │   ├── chunking.py         # TOC-aware sections → overlapping token chunks
 │   ├── embeddings.py       # embedding backends (sentence-transformers, hash, none)
@@ -46,8 +47,13 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
                                    server.py (MCP tools)
 ```
 
-1. **Extract** (`extract.py`, PyMuPDF): text by page as layout blocks with
-   dehyphenation. A page with fewer than `ocr_min_chars` characters is OCR'd with
+1. **Extract** (`extract.py`, PyMuPDF): text by page as lines with dehyphenation.
+   Reading order (`layout.py`): PyMuPDF 2's layout analyzer (`pymupdf4llm.to_json`,
+   a bundled ONNX model, no download) gives boxes in reading order and our lines
+   are grouped by box; the analyzer's own text is not used, it splits words on
+   OCR'd text layers. Inside a box or an OCR block, lines that sit side by side are
+   split into columns, and consecutive regions with the same columns are read
+   column by column. `ingest.layout = false` keeps the PDF block order. A page with fewer than `ocr_min_chars` characters is OCR'd with
    Tesseract (`ita+eng`) through PyMuPDF's `get_textpage_ocr`. OCR lines that are
    mostly not words (Tesseract reading a photo) are dropped. Celsius/Fahrenheit
    pairs mangled by OCR ("79 •c I 174 ' F") are rewritten as "79 °C / 174 °F".
@@ -105,8 +111,9 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
 
 - Running headers and footers are recognised only inside the outer 5% of the
   page and when they repeat on at least 3 pages.
-- Multi-column layouts follow PyMuPDF's block order, which is usually but not
-  always the reading order.
+- Reading order relies on the layout analyzer's boxes and on side-by-side line
+  detection; captions next to a column can still land inside the column's text.
+  Tables are kept in the order of the PDF.
 - Without a PDF outline and without running heads there are no chapters: chunks
   are split by size only. Chapters read from running heads have no sections.
 - Token counts fall back to a characters/4 estimate when no tokenizer is loaded.

@@ -247,6 +247,7 @@ uv run mcp-book search "perché la maionese impazzisce"
 | `chunking` | `target_tokens` / `max_tokens` / `overlap_tokens` | 650 / 800 / 100 | |
 | `ingest` | `ocr`, `ocr_languages`, `ocr_min_chars`, `ocr_dpi` | `true`, `ita+eng`, 25, 300 | |
 | `ingest` | `extract_tables` | `true` | |
+| `ingest` | `layout` | `true` | ordine di lettura delle pagine a più colonne (analisi del layout di PyMuPDF) |
 | `search` | `top_k`, `candidates`, `rrf_k` | 8, 50, 60 | |
 | `server` | `host`, `port` | `127.0.0.1`, 8765 | solo trasporto HTTP |
 

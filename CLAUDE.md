@@ -17,7 +17,8 @@ Rispondi all'utente in italiano. Codice, identificatori, commenti e commit in in
 
 ## Struttura
 `src/mcp_book/`: `config` (config.toml rigido, chiavi sconosciute = errore) · `models` ·
-`citation` · `extract` (PyMuPDF, OCR Tesseract, TOC, tabelle pdfplumber) · `margins`
+`citation` · `extract` (PyMuPDF, OCR Tesseract, TOC, tabelle pdfplumber) · `layout`
+(ordine di lettura: riquadri del layout analyzer, colonne affiancate) · `margins`
 (intestazioni e piè di pagina ripetuti: rimossi e, senza TOC, usati come capitoli) · `chunking`
 (sezioni dal TOC, chunk con overlap) · `embeddings` (sentence-transformers, `hash` per i
 test, `none`) · `store` (unico SQLite: tabelle, FTS5, vec0) · `search` (BM25 + KNN, RRF) ·
@@ -33,6 +34,7 @@ bordi, pagina solo immagine per l'OCR); `tests/conftest.py` ha le fixture `sampl
   errori per l'assistente con `ToolError`; nei test `from mcp import Client` accetta
   direttamente il server. Verifica le API nel pacchetto installato, non a memoria.
 - Con il trasporto stdio lo stdout appartiene al protocollo: log e progressi solo su stderr.
+  `pymupdf4llm.to_json` stampa messaggi su stdout: in `layout.py` è rediretto su stderr.
 - Argomenti degli strumenti = indici di pagina PDF da 1; le citazioni usano la
   `page_label` stampata quando esiste. Non confonderli.
 - `chunks.id` è AUTOINCREMENT di proposito: un `chunk_id` vecchio non deve puntare a
