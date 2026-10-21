@@ -20,7 +20,7 @@ class LibraryConfig:
 class EmbeddingConfig:
     backend: str = "sentence-transformers"
     model: str = "BAAI/bge-m3"
-    device: str = "cpu"
+    device: str = "auto"
     batch_size: int = 16
     query_prefix: str = ""
     passage_prefix: str = ""

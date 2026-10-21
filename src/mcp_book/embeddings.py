@@ -55,7 +55,8 @@ class SentenceTransformerEmbedder:
                 from sentence_transformers import SentenceTransformer
 
                 logger.info("Loading embedding model %s", self.config.model)
-                self._model = SentenceTransformer(self.config.model, device=self.config.device)
+                device = None if self.config.device == "auto" else self.config.device
+                self._model = SentenceTransformer(self.config.model, device=device)
             return self._model
 
     @property

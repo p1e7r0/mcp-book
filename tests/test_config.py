@@ -16,6 +16,7 @@ def test_defaults_resolve_relative_to_config_file(tmp_path: Path) -> None:
     assert config.database_path == tmp_path / "data" / "library.sqlite"
     assert config.chunking.target_tokens == 500
     assert config.embedding.model == "BAAI/bge-m3"
+    assert config.embedding.device == "auto"
 
 
 def test_repository_config_is_valid() -> None:

@@ -26,7 +26,143 @@ embedding multilingue locale, Tesseract per le pagine scansionate.
 
 Dettagli e scelte progettuali in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-### Installazione
+### Guida passo passo: Mac con Apple Silicon e VS Code
+
+Vale per Mac con chip M1 o successivi e macOS 14 (Sonoma) o più recente: torch non
+pubblica più pacchetti per i Mac Intel. Controlla nel Terminale:
+
+```bash
+uname -m                   # deve stampare arm64
+sw_vers -productVersion    # 14.0 o superiore
+```
+
+#### 1. Installa gli strumenti
+
+Se non hai Homebrew, installalo da [brew.sh](https://brew.sh). Poi:
+
+```bash
+brew install uv tesseract tesseract-lang
+tesseract --list-langs | grep -x ita       # deve stampare: ita
+```
+
+`tesseract-lang` contiene tutte le lingue, italiano compreso. Python non va
+installato a parte: uv scarica da solo la versione indicata in `.python-version`.
+
+#### 2. Scarica il progetto
+
+```bash
+cd ~
+git clone https://github.com/p1e7r0/mcp-book.git
+cd mcp-book
+uv sync
+```
+
+Se macOS propone di installare gli strumenti da riga di comando di Xcode (servono a
+`git`), accetta e poi ripeti il comando. `uv sync` crea `.venv` con tutte le
+dipendenze, compreso torch per Apple Silicon con supporto alla GPU (MPS).
+
+#### 3. Indica dove sono i PDF
+
+Copia i PDF in `~/mcp-book/library/` (`mkdir -p ~/mcp-book/library` la crea), oppure
+lasciali dove sono e modifica `config.toml`:
+
+```toml
+[library]
+pdf_dir = "~/Documents/Libri di cucina"
+```
+
+L'indice resta in `~/mcp-book/data/`. Il `device = "auto"` già presente in
+`config.toml` usa la GPU del Mac.
+
+#### 4. Indicizza i libri
+
+```bash
+cd ~/mcp-book
+uv run mcp-book ingest
+uv run mcp-book books                                   # libri indicizzati
+uv run mcp-book search "perché la maionese impazzisce"  # prova una ricerca
+```
+
+- La prima volta scarica il modello `BAAI/bge-m3` (circa 2,3 GB, in
+  `~/.cache/huggingface`).
+- Le pagine scansionate passano per l'OCR, che è la parte più lenta.
+- Se macOS chiede al Terminale l'accesso a Documenti o Scrivania, consenti.
+- Quando aggiungi libri rilancia `uv run mcp-book ingest`: elabora solo i file
+  nuovi o modificati.
+
+#### 5. Trova i percorsi assoluti
+
+Le app avviate dal Dock non vedono il PATH del Terminale, quindi nelle
+configurazioni MCP servono percorsi assoluti:
+
+```bash
+which uv        # di solito /opt/homebrew/bin/uv
+echo $HOME      # per esempio /Users/mario
+```
+
+Negli esempi seguenti sostituisci `/Users/TUO_NOME` con il risultato di `echo $HOME`.
+
+#### 6a. VS Code con GitHub Copilot (modalità agente)
+
+1. Cmd+Shift+P › **MCP: Open User Configuration** per averlo in tutti i progetti
+   (per un solo progetto usa invece il file `.vscode/mcp.json` di quel progetto).
+2. Incolla, adattando i percorsi:
+
+   ```json
+   {
+     "servers": {
+       "mcp-book": {
+         "type": "stdio",
+         "command": "/opt/homebrew/bin/uv",
+         "args": ["--directory", "/Users/TUO_NOME/mcp-book", "run", "mcp-book", "serve"]
+       }
+     }
+   }
+   ```
+
+3. Salva e avvia il server: Cmd+Shift+P › **MCP: List Servers** › mcp-book ›
+   **Start Server**. Al primo avvio VS Code chiede se ti fidi del server: conferma.
+4. Apri la chat di Copilot, scegli la modalità **Agent**, apri il selettore degli
+   strumenti e controlla che i sei strumenti di mcp-book siano attivi.
+5. Chiedi, per esempio: «Cerca nei miei libri a che temperatura cuoce il salmone
+   sottovuoto e cita la fonte.»
+
+Se qualcosa non va, **MCP: List Servers** › mcp-book › **Show Output** mostra i
+log del server.
+
+#### 6b. VS Code con l'estensione Claude Code
+
+L'estensione legge la stessa configurazione MCP della CLI `claude` (se il comando
+manca: `curl -fsSL https://claude.ai/install.sh | bash`). Nel terminale integrato di
+VS Code:
+
+```bash
+claude mcp add --scope user mcp-book -- \
+  /opt/homebrew/bin/uv --directory /Users/TUO_NOME/mcp-book run mcp-book serve
+claude mcp list            # mcp-book deve risultare connesso
+```
+
+`--scope user` lo rende disponibile in tutti i progetti. Poi, nel pannello di
+Claude Code, chiedi di cercare nei tuoi libri.
+
+#### 6c. Claude Desktop
+
+Vedi la sezione [Claude Desktop](#claude-desktop): su Mac il file è
+`~/Library/Application Support/Claude/claude_desktop_config.json` e `command` deve
+essere `/opt/homebrew/bin/uv`.
+
+#### Problemi comuni
+
+| Sintomo | Soluzione |
+| --- | --- |
+| Il server non parte, `spawn uv ENOENT` | in `command` serve il percorso assoluto di uv |
+| Errori `mps` durante l'ingestione | `device = "cpu"` in `config.toml`, oppure lancia con `PYTORCH_ENABLE_MPS_FALLBACK=1 uv run mcp-book ingest` |
+| Avviso `sqlite-vec unavailable` | il Python in uso non carica estensioni SQLite: `rm -rf .venv && uv sync --managed-python` |
+| Avviso `OCR skipped` | `brew install tesseract tesseract-lang`; se persiste, `export TESSDATA_PREFIX=/opt/homebrew/share/tessdata` prima di `ingest` |
+| Errore che chiede `--rebuild` | hai cambiato `model`: `uv run mcp-book ingest --rebuild` |
+| La prima ricerca è lenta | il modello viene caricato in memoria alla prima domanda, poi resta caricato |
+
+### Installazione su altri sistemi
 
 Requisiti: Python 3.11+, [uv](https://docs.astral.sh/uv/), Tesseract con il
 pacchetto della lingua italiana.
@@ -93,7 +229,7 @@ uv run mcp-book search "perché la maionese impazzisce"
 | `library` | `index_dir` | `data` | contiene `library.sqlite` |
 | `embedding` | `backend` | `sentence-transformers` | `none` = solo BM25 |
 | `embedding` | `model` | `BAAI/bge-m3` | cambiarlo richiede `ingest --rebuild` |
-| `embedding` | `device` | `cpu` | `cuda` o `mps` se disponibili |
+| `embedding` | `device` | `auto` | `cuda`, poi `mps` (GPU Apple), poi `cpu` |
 | `chunking` | `target_tokens` / `max_tokens` / `overlap_tokens` | 650 / 800 / 100 | |
 | `ingest` | `ocr`, `ocr_languages`, `ocr_min_chars`, `ocr_dpi` | `true`, `ita+eng`, 25, 300 | |
 | `ingest` | `extract_tables` | `true` | |
@@ -108,7 +244,8 @@ quei modelli troncano a 512 token: abbassa `max_tokens` di conseguenza.
 
 ### Claude Desktop
 
-In `claude_desktop_config.json` (Impostazioni › Sviluppatore › Modifica config):
+In `claude_desktop_config.json` (Impostazioni › Sviluppatore › Modifica config; su Mac
+è `~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -214,7 +351,57 @@ multilingual embedding model, Tesseract for scanned pages.
 
 Design notes in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-### Installation
+### Step by step: Apple Silicon Mac and VS Code
+
+Requires an M1 or later Mac on macOS 14+ (torch no longer ships Intel Mac wheels):
+`uname -m` must print `arm64`.
+
+```bash
+brew install uv tesseract tesseract-lang
+cd ~ && git clone https://github.com/p1e7r0/mcp-book.git && cd mcp-book
+uv sync                                    # Python and torch with MPS included
+mkdir -p library && cp ~/Books/*.pdf library/   # or set pdf_dir in config.toml
+uv run mcp-book ingest                     # first run downloads bge-m3 (~2.3 GB)
+uv run mcp-book search "why does mayonnaise split"
+which uv; echo $HOME                       # absolute paths for the configs below
+```
+
+`device = "auto"` in `config.toml` already uses the Mac GPU (MPS).
+
+**VS Code + GitHub Copilot (agent mode)**: Cmd+Shift+P › **MCP: Open User
+Configuration** (or `.vscode/mcp.json` for one project), then:
+
+```json
+{
+  "servers": {
+    "mcp-book": {
+      "type": "stdio",
+      "command": "/opt/homebrew/bin/uv",
+      "args": ["--directory", "/Users/YOUR_NAME/mcp-book", "run", "mcp-book", "serve"]
+    }
+  }
+}
+```
+
+Start it from **MCP: List Servers** › mcp-book › **Start Server**, trust it, then
+enable its tools in Copilot Chat's **Agent** mode. **Show Output** in the same menu
+shows the server logs.
+
+**VS Code + Claude Code extension**: it shares the CLI's MCP config. In the
+integrated terminal:
+
+```bash
+claude mcp add --scope user mcp-book -- \
+  /opt/homebrew/bin/uv --directory /Users/YOUR_NAME/mcp-book run mcp-book serve
+claude mcp list
+```
+
+Troubleshooting: `spawn uv ENOENT` → use uv's absolute path; `mps` errors → set
+`device = "cpu"` or run with `PYTORCH_ENABLE_MPS_FALLBACK=1`; `sqlite-vec
+unavailable` → `rm -rf .venv && uv sync --managed-python`; OCR
+skipped → `export TESSDATA_PREFIX=/opt/homebrew/share/tessdata`.
+
+### Installation on other systems
 
 Requires Python 3.11+, [uv](https://docs.astral.sh/uv/) and Tesseract with Italian
 language data.

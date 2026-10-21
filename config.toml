@@ -8,7 +8,9 @@ index_dir = "data"
 # "sentence-transformers" (default), "none" (BM25 only) or "hash" (tests only)
 backend = "sentence-transformers"
 model = "BAAI/bge-m3"
-device = "cpu"
+# "auto" picks cuda, then mps (Apple Silicon GPU), then cpu. Set "cpu" if mps
+# raises errors on your machine.
+device = "auto"
 batch_size = 16
 # Leave empty for automatic prefixes ("query: " / "passage: " for e5 models)
 query_prefix = ""
