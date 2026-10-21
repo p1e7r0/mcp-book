@@ -47,7 +47,8 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
 
 1. **Extract** (`extract.py`, PyMuPDF): text by page as layout blocks with
    dehyphenation. A page with fewer than `ocr_min_chars` characters is OCR'd with
-   Tesseract (`ita+eng`) through PyMuPDF's `get_textpage_ocr`. The outline (TOC)
+   Tesseract (`ita+eng`) through PyMuPDF's `get_textpage_ocr`. OCR lines that are
+   mostly not words (Tesseract reading a photo) are dropped. The outline (TOC)
    gives chapters and sections; printed page labels are kept when the PDF has them.
    Tables come from pdfplumber, stored as rows (JSON) and as Markdown.
 2. **Chunk** (`chunking.py`): the TOC splits the book into sections, refined

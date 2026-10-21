@@ -16,6 +16,8 @@ TEXT_FLAGS = pymupdf.TEXT_DEHYPHENATE | pymupdf.TEXT_PRESERVE_WHITESPACE
 JUNK_TITLE = re.compile(r"^(untitled|microsoft word\b|document\d*$)|\.(docx?|indd|pdf)$", re.I)
 HYPHENATED_LINE_END = re.compile(r"(?<=[^\W\d_])[-\u00ad\u2010]$")
 PAGE_LABEL_TITLE = re.compile(r"^(\d+|[ivxlcdm]+)$", re.I)
+OCR_WORD = re.compile(r"[^\W\d_]{3,}")
+OCR_QUANTITY = re.compile(r"^[-—]?\d+(?:[.,·]\d+)?\s?(?:%|°[CF]|[a-z]{1,3})?$")
 
 
 class OcrUnavailableError(RuntimeError):
@@ -120,7 +122,38 @@ def ocr_page(page: pymupdf.Page, config: IngestConfig) -> str:
         raise OcrUnavailableError(
             f"Tesseract not available or language data missing: {error}"
         ) from error
-    return _blocks_to_text(page.get_text("blocks", textpage=textpage, flags=TEXT_FLAGS))
+    return drop_ocr_noise(
+        _blocks_to_text(page.get_text("blocks", textpage=textpage, flags=TEXT_FLAGS))
+    )
+
+
+def is_text_line(line: str) -> bool:
+    stripped = line.strip()
+    if len(stripped) >= 2 and OCR_QUANTITY.match(stripped):
+        return True
+    words = OCR_WORD.findall(stripped)
+    visible = len("".join(stripped.split()))
+    return len(words) >= 2 and sum(len(word) for word in words) >= 0.6 * visible
+
+
+def drop_ocr_noise(text: str) -> str:
+    paragraphs = [paragraph.splitlines() for paragraph in text.split("\n\n")]
+    lines = [line for paragraph in paragraphs for line in paragraph]
+    strong = [is_text_line(line) for line in lines]
+    kept = []
+    for index, line in enumerate(lines):
+        previous = strong[index - 1] if index > 0 else True
+        following = strong[index + 1] if index + 1 < len(lines) else True
+        weak = any(character.isalnum() for character in line) and previous and following
+        kept.append(strong[index] or weak)
+
+    cleaned, position = [], 0
+    for paragraph in paragraphs:
+        kept_lines = [line for offset, line in enumerate(paragraph) if kept[position + offset]]
+        position += len(paragraph)
+        if kept_lines:
+            cleaned.append("\n".join(kept_lines))
+    return "\n\n".join(cleaned)
 
 
 def extract_tables(path: Path) -> list[Table]:

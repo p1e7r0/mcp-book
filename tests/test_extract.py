@@ -3,7 +3,13 @@ from pathlib import Path
 import pymupdf
 
 from mcp_book.config import IngestConfig
-from mcp_book.extract import extract_book, extract_page, join_lines, rows_to_markdown
+from mcp_book.extract import (
+    drop_ocr_noise,
+    extract_book,
+    extract_page,
+    join_lines,
+    rows_to_markdown,
+)
 
 from conftest import requires_tesseract
 from sample_pdf import AUTHOR, TITLE, build_sample_pdf
@@ -88,6 +94,21 @@ def test_line_end_hyphenation_is_joined(tmp_path: Path) -> None:
 def test_join_lines_keeps_inner_hyphens_and_numbers() -> None:
     assert join_lines(["un risultato real-world e 20-", "30 min"]) == (
         "un risultato real-world e 20-\n30 min"
+    )
+
+
+def test_ocr_noise_from_photos_is_dropped() -> None:
+    text = (
+        "7\nEI\n# EE\nÈ\n\n"
+        "Floral essences can be concentrated in\na rotary evaporator. The vegetables\nwill\n"
+        "quickly wilt from the heat.\n\n"
+        "Freeze to below\n-45 °C\n5%\n4\n.\\ a”"
+    )
+
+    assert drop_ocr_noise(text) == (
+        "Floral essences can be concentrated in\na rotary evaporator. The vegetables\nwill\n"
+        "quickly wilt from the heat.\n\n"
+        "Freeze to below\n-45 °C\n5%"
     )
 
 
