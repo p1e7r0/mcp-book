@@ -32,6 +32,8 @@ def test_tools_are_registered(indexed_config: Config) -> None:
     assert set(tools) == TOOLS
     assert tools["search"].input_schema["properties"]["top_k"]["default"] == 8
     assert "10 pages" in tools["read_pages"].description
+    query = tools["search"].input_schema["properties"]["query"]["description"]
+    assert "language of the books" in query
 
 
 def test_every_tool_returns_a_citation(indexed_config: Config) -> None:

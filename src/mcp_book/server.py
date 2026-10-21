@@ -16,9 +16,12 @@ from mcp_book.library import MAX_CONTEXT, MAX_TOP_K, Library, LibraryError
 INSTRUCTIONS = """\
 Personal library of technical cookbooks (PDF). Do not guess what the books say: \
 call `search` first, then `read_chunk` or `read_pages` to read around the best hits, \
-and `get_tables` for tables (temperatures, ratios, times). Pages are 1-based PDF page \
-indexes; `page_label` is the number printed in the book. Quote the `citation` field \
-of every passage you rely on, in the form "Title, Chapter, p. N".\
+and `get_tables` for tables (temperatures, ratios, times). Write `search` queries in the \
+language the books are written in, whatever language the user speaks: keyword matching \
+only works within one language. If the library mixes languages, search once per \
+language. Pages are 1-based PDF page indexes; `page_label` is the number printed in the \
+book. Quote the `citation` field of every passage you rely on, in the form \
+"Title, Chapter, p. N".\
 """
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, idempotentHint=True, openWorldHint=False)
@@ -54,7 +57,13 @@ def create_server(config: Config, library: Library | None = None) -> MCPServer:
     @server.tool(annotations=READ_ONLY)
     @_tool_errors
     def search(
-        query: Annotated[str, Field(description="Question or keywords, Italian or English")],
+        query: Annotated[
+            str,
+            Field(
+                description="Question or keywords in the language of the books searched "
+                "(translate the user's question if needed)"
+            ),
+        ],
         book_ids: Annotated[
             list[str] | None, Field(description="Restrict to these books (from list_books)")
         ] = None,
