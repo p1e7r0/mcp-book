@@ -1,0 +1,11 @@
+# Container paths: mount the PDFs on /library (read-only) and a volume on /data.
+
+[library]
+pdf_dir = "/library"
+index_dir = "/data"
+
+[embedding]
+backend = "sentence-transformers"
+model = "BAAI/bge-m3"
+device = "cpu"
+batch_size = 16
