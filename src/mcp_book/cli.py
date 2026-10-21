@@ -65,6 +65,34 @@ def command_books(config: Config, arguments: argparse.Namespace) -> int:
     return 0
 
 
+def command_serve(config: Config, arguments: argparse.Namespace) -> int:
+    from mcp_book.server import serve
+
+    if not config.database_path.exists():
+        log(f"Warning: no index at {config.database_path}; run `mcp-book ingest` first.")
+    serve(config, arguments.transport, arguments.host, arguments.port)
+    return 0
+
+
+def command_search(config: Config, arguments: argparse.Namespace) -> int:
+    from mcp_book.library import Library, LibraryError
+
+    library = Library(config)
+    try:
+        result = library.search(arguments.query, arguments.book or None, arguments.top_k)
+    except LibraryError as error:
+        log(f"Error: {error}")
+        return 1
+    finally:
+        library.close()
+    if result.get("note"):
+        log(result["note"])
+    for hit in result["results"]:
+        print(f"[{hit['chunk_id']}] {hit['citation']}  ({', '.join(hit['matched_by'])})")
+        print(f"    {hit['excerpt']}\n")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mcp-book", description="Search and read a personal PDF library through MCP."
@@ -84,6 +112,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     books = commands.add_parser("books", help="list indexed books")
     books.set_defaults(handler=command_books)
+
+    search = commands.add_parser("search", help="run a search from the terminal")
+    search.add_argument("query")
+    search.add_argument("--book", action="append", help="restrict to a book id (repeatable)")
+    search.add_argument("-k", "--top-k", type=int, default=None)
+    search.set_defaults(handler=command_search)
+
+    serve = commands.add_parser("serve", help="run the MCP server")
+    serve.add_argument("--transport", choices=["stdio", "http"], default="stdio")
+    serve.add_argument("--host", help="HTTP host (default: server.host)")
+    serve.add_argument("--port", type=int, help="HTTP port (default: server.port)")
+    serve.set_defaults(handler=command_serve)
     return parser
 
 
