@@ -77,6 +77,21 @@ def test_no_toc_and_empty_pages() -> None:
     assert (chunk.chapter, chunk.section, chunk.page_start) == (None, None, 2)
 
 
+def test_back_of_book_index_pages_are_not_chunked() -> None:
+    entries = [
+        f"voce {letter}, {index}·{index * 3}-{index * 3 + 2}"
+        for index, letter in enumerate("abcdefghijkl", 1)
+    ]
+    pages = [
+        PageText(page=1, text="La maionese, 3 tuorli, 1 cucchiaio di senape, 500 g di olio."),
+        PageText(page=2, text="aceto\n" + "\n".join(entries)),
+    ]
+
+    chunks = chunk_book(pages, [], ChunkingConfig())
+
+    assert [(chunk.page_start, chunk.page_end) for chunk in chunks] == [(1, 1)]
+
+
 def test_custom_token_counter_is_used() -> None:
     pages = [PageText(page=1, text=sentences(10))]
 

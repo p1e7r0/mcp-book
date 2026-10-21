@@ -13,6 +13,10 @@ TokenCounter = Callable[[str], int]
 
 PARAGRAPH_BREAK = re.compile(r"\n\s*\n")
 SENTENCE_BREAK = re.compile(r"(?<=[.!?…])\s+(?=[\"«(\[A-ZÀ-ÖØ-Ý0-9])")
+INDEX_REFERENCE = re.compile(
+    r"(?<=[^\W\d_])\s*,\s*\d+(?:\s?[·.-]\s?\d+)?(?:\s?[-–]\s?\d+)?(?=\s*[,;\n]|\s*$)", re.M
+)
+WORD = re.compile(r"[^\W\d_]{2,}")
 
 
 def approximate_tokens(text: str) -> int:
@@ -32,6 +36,11 @@ class Segment:
     chapter: str | None
     section: str | None
     units: list[Unit] = field(default_factory=list)
+
+
+def is_index_page(text: str) -> bool:
+    references = len(INDEX_REFERENCE.findall(text))
+    return references >= 10 and references >= 0.05 * len(WORD.findall(text))
 
 
 def normalize_heading(text: str) -> str:
@@ -181,6 +190,7 @@ def chunk_book(
     count_tokens: TokenCounter = approximate_tokens,
 ) -> list[Chunk]:
     chunks: list[Chunk] = []
+    pages = [page for page in pages if not is_index_page(page.text)]
     for segment in build_segments(pages, toc, count_tokens, config.max_tokens):
         for group in pack(segment.units, config):
             chunks.append(

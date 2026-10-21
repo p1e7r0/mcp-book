@@ -55,7 +55,9 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
    inside a page when the heading text is found there. Sections are hard
    boundaries; inside a section, paragraphs (sentences when a paragraph is too
    long) are packed up to ~650 tokens (hard max 800) with ~100 tokens of overlap.
-   Each chunk keeps book, chapter, section, first and last page.
+   Each chunk keeps book, chapter, section, first and last page. Back-of-book
+   index pages (many "term, 3·93-94" entries) are not chunked: they matched almost
+   any keyword query. They stay readable through `read_pages`.
 3. **Embed** (`embeddings.py`): `BAAI/bge-m3` by default via sentence-transformers,
    normalised vectors. It accepts 8192 tokens, so 800-token chunks are not
    truncated (multilingual-e5 stops at 512). Token counts come from the model's
