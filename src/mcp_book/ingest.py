@@ -19,6 +19,10 @@ from mcp_book.store import BookRecord, Store
 logger = logging.getLogger(__name__)
 
 
+class EmbeddingModelError(ValueError):
+    pass
+
+
 @dataclass
 class IngestReport:
     added: list[str] = field(default_factory=list)
@@ -80,7 +84,14 @@ def ingest_folder(
 
     use_vectors = embedder is not None and store.vectors_available
     if use_vectors:
-        store.configure_vectors(embedder.name, embedder.dimension)
+        try:
+            dimension = embedder.dimension
+        except Exception as error:
+            raise EmbeddingModelError(
+                f"Cannot load embedding model {embedder.name!r}: {error}. Check the network or "
+                'the model name, or set embedding.backend = "none" for keyword search only.'
+            ) from error
+        store.configure_vectors(embedder.name, dimension)
     elif embedder is not None:
         progress("sqlite-vec unavailable: indexing for keyword search only")
     count_tokens = embedder.count_tokens if embedder is not None else approximate_tokens

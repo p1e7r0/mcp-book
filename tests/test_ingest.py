@@ -116,3 +116,16 @@ def test_cli_reports_missing_folder(tmp_path: Path, capsys: pytest.CaptureFixtur
 
     assert main(["-c", str(config_file), "ingest", str(tmp_path / "missing")]) == 1
     assert "PDF folder not found" in capsys.readouterr().err
+
+
+class UnloadableEmbedder(HashEmbedder):
+    @property
+    def dimension(self) -> int:
+        raise OSError("403 Forbidden")
+
+
+def test_unloadable_model_gives_readable_error(config: Config, library: Path) -> None:
+    store = Store(config.database_path)
+    with pytest.raises(ValueError, match='backend = "none"'):
+        ingest_folder(library, config, store, UnloadableEmbedder())
+    assert store.list_books() == []

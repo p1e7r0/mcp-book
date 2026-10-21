@@ -86,3 +86,17 @@ def test_excerpt_centres_on_match() -> None:
     assert excerpt.startswith("…") and excerpt.endswith("…")
     assert len(excerpt) <= 362
     assert make_excerpt("breve testo", "x") == "breve testo"
+
+
+class BrokenEmbedder(HashEmbedder):
+    def embed_query(self, text: str):
+        raise OSError("offline")
+
+
+def test_query_embedding_failure_falls_back_to_keywords(store: Store) -> None:
+    outcome = hybrid_search(
+        store, BrokenEmbedder(), "maionese", book_ids=None, top_k=3, config=SearchConfig()
+    )
+    assert outcome.mode == "keyword"
+    assert "offline" in outcome.note
+    assert outcome.hits

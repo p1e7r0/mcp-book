@@ -115,10 +115,18 @@ def hybrid_search(
 
     use_vectors, note = semantic_status(store, embedder)
     if use_vectors:
-        vector = embedder.embed_query(query)
-        rankings["semantic"] = [
-            chunk_id for chunk_id, _ in store.vector_search(vector, book_ids, candidates)
-        ]
+        try:
+            vector = embedder.embed_query(query)
+        except Exception as error:
+            logger.exception("Embedding the query failed")
+            use_vectors, note = (
+                False,
+                f"Embedding model unavailable ({error}): keyword search only.",
+            )
+        else:
+            rankings["semantic"] = [
+                chunk_id for chunk_id, _ in store.vector_search(vector, book_ids, candidates)
+            ]
 
     scores: dict[int, float] = {}
     matched: dict[int, list[str]] = {}
