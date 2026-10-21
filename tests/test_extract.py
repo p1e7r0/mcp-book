@@ -65,6 +65,18 @@ def test_sidecar_overrides_metadata(tmp_path: Path) -> None:
     assert book.metadata.author == "Anna Bianchi"
 
 
+def test_title_from_file_name_collapses_spaces(tmp_path: Path) -> None:
+    document = pymupdf.open()
+    document.new_page()
+    document.save(tmp_path / "Volume 2 - Tecniche_di base.pdf")
+
+    book = extract_book(
+        tmp_path / "Volume 2 - Tecniche_di base.pdf", IngestConfig(ocr=False, extract_tables=False)
+    )
+
+    assert book.metadata.title == "Volume 2 Tecniche di base"
+
+
 def test_outline_of_page_numbers_becomes_page_labels(tmp_path: Path) -> None:
     titles = ["cover1", "i", "ii", "1", "2", "3", "4", "5", "6", "7"]
     document = pymupdf.open()

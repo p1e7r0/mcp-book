@@ -44,7 +44,7 @@ def read_metadata(path: Path, document: pymupdf.Document) -> BookMetadata:
     title = (pdf_metadata.get("title") or "").strip()
     author = (pdf_metadata.get("author") or "").strip() or None
     if not title or JUNK_TITLE.search(title):
-        title = re.sub(r"[_-]+", " ", path.stem).strip()
+        title = " ".join(re.sub(r"[_-]+", " ", path.stem).split())
 
     sidecar = path.with_suffix(".toml")
     if sidecar.is_file():
