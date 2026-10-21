@@ -8,6 +8,7 @@ from mcp_book.extract import (
     extract_book,
     extract_page,
     join_lines,
+    normalize_temperatures,
     rows_to_markdown,
 )
 
@@ -121,6 +122,20 @@ def test_ocr_noise_from_photos_is_dropped() -> None:
         "Floral essences can be concentrated in\na rotary evaporator. The vegetables\nwill\n"
         "quickly wilt from the heat.\n\n"
         "Freeze to below\n-45 °C\n5%"
+    )
+
+
+def test_ocr_temperatures_are_normalized() -> None:
+    text = (
+        "Cook at 79 •c I 174 ' F and 90% humidity. Fry in 160 ' C I 325 ' Foil.\n"
+        "Bath at 55 oc 1 131 oF, then 25-30 ' C I 77-86 ' F; freeze at -196 °C/ —321 °F.\n"
+        "Hold at 63 ·c I\n\n145 •p. Chapter 3·12 and 20 C students stay as they are."
+    )
+
+    assert normalize_temperatures(text) == (
+        "Cook at 79 °C / 174 °F and 90% humidity. Fry in 160 °C / 325 °F oil.\n"
+        "Bath at 55 °C / 131 °F, then 25-30 °C / 77-86 °F; freeze at -196 °C / -321 °F.\n"
+        "Hold at 63 °C / 145 °F. Chapter 3·12 and 20 C students stay as they are."
     )
 
 

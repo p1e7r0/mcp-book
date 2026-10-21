@@ -20,6 +20,13 @@ PAGE_LABEL_TITLE = re.compile(r"^(\d+|[ivxlcdm]+)$", re.I)
 OCR_WORD = re.compile(r"[^\W\d_]{3,}")
 OCR_QUANTITY = re.compile(r"^[-—]?\d+(?:[.,·]\d+)?\s?(?:%|°[CF]|[a-z]{1,3})?$")
 MARGIN = 0.05
+NUMBER = r"[-—–]?\d+(?:[.,]\d+)?(?:\s?[-–]\s?\d+(?:[.,]\d+)?)?"
+CELSIUS_MARK = r"(?:[°º•·'\"’”`]|o(?=\s?[cC]))?"
+FAHRENHEIT_MARK = r"(?:[°º•·'\"’”`]|[oO](?=[FfPp]))?"
+TEMPERATURE_PAIR = re.compile(
+    rf"(?P<celsius>{NUMBER})\s?{CELSIUS_MARK}\s?[cC]\s*(?:[I/l|]|(?<=\s)1(?=\s))\s*"
+    rf"(?P<fahrenheit>{NUMBER})\s?{FAHRENHEIT_MARK}\s?[FfPpr](?P<after>[a-z]?)"
+)
 
 
 class OcrUnavailableError(RuntimeError):
@@ -140,6 +147,7 @@ def extract_page_parts(page: pymupdf.Page, config: IngestConfig) -> PageParts:
         else:
             if _length(ocr_header, ocr_body, ocr_footer) > _length(header, body, footer):
                 header, body, footer, used_ocr = ocr_header, ocr_body, ocr_footer, True
+    body = normalize_temperatures(body)
     text = PageText(page=page.number + 1, text=body, label=page.get_label() or None, ocr=used_ocr)
     return PageParts(page=text, header=header, footer=footer)
 
@@ -164,6 +172,19 @@ def ocr_page(page: pymupdf.Page, config: IngestConfig) -> tuple[list[str], str, 
         drop_ocr_noise(body),
         drop_ocr_noise("\n".join(footer)).splitlines(),
     )
+
+
+def _clean_number(number: str) -> str:
+    return re.sub(r"\s", "", number).replace("—", "-").replace("–", "-")
+
+
+def normalize_temperatures(text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        after = f" {match['after']}" if match["after"] else ""
+        celsius, fahrenheit = _clean_number(match["celsius"]), _clean_number(match["fahrenheit"])
+        return f"{celsius} °C / {fahrenheit} °F{after}"
+
+    return TEMPERATURE_PAIR.sub(replace, text)
 
 
 def is_text_line(line: str) -> bool:
