@@ -89,7 +89,7 @@ uv run mcp-book search "perché la maionese impazzisce"  # prova una ricerca
   `~/.cache/huggingface`).
 - Le pagine scansionate passano per l'OCR, che è la parte più lenta: su un M3 Max
   circa 1,6 s a pagina, quindi un volume di 500 pagine con 200 pagine scansionate
-  richiede circa 6 minuti, contro uno se il PDF ha già il testo.
+  richiede circa 6-7 minuti, contro due se il PDF ha già il testo.
 - Se macOS chiede al Terminale l'accesso a Documenti o Scrivania, consenti.
 - Quando aggiungi libri rilancia `uv run mcp-book ingest`: elabora solo i file
   nuovi o modificati.
