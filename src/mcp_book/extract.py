@@ -11,6 +11,7 @@ from mcp_book.config import IngestConfig
 from mcp_book.layout import Box, Line, layout_boxes, reading_order, text_lines
 from mcp_book.margins import PageParts, join_parts, remove_running_lines
 from mcp_book.models import BookMetadata, ExtractedBook, PageText, Table, TocEntry
+from mcp_book.recipes import Recipe, Word, find_recipes, place_recipes, remove_recipe_lines
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,12 @@ def extract_book(path: Path, config: IngestConfig) -> ExtractedBook:
         logger.info("%s: %d chapters read from running heads", path.name, len(running_chapters))
         toc = running_chapters
     tables = extract_tables(path) if config.extract_tables else []
+    for part in parts:
+        offset = sum(table.page == part.page.page for table in tables)
+        for position, table in enumerate(part.tables):
+            table.index = offset + position
+        tables += part.tables
+    tables.sort(key=lambda table: (table.page, table.index))
     return ExtractedBook(metadata=metadata, pages=pages, toc=toc, tables=tables)
 
 
@@ -127,40 +134,76 @@ def _length(header: list[str], body: str, footer: list[str]) -> int:
     return len(body.strip()) + sum(len(line) for line in header + footer)
 
 
+def _recipe_text(recipe: Recipe) -> str:
+    text = rows_to_markdown([[name.upper() for name in recipe.columns], *recipe.rows])
+    if recipe.procedure:
+        text += "\n\nPROCEDURE\n" + join_lines([line.text for line in recipe.procedure])
+    return text
+
+
+def read_page(
+    page: pymupdf.Page,
+    boxes: list[Box] | None = None,
+    textpage: pymupdf.TextPage | None = None,
+) -> tuple[list[str], str, list[str], list[Recipe]]:
+    height = page.rect.height
+    words = [
+        Word(*word[:5])
+        for word in page.get_text("words", flags=TEXT_FLAGS, textpage=textpage)
+        if word[1] >= MARGIN * height and word[3] <= (1 - MARGIN) * height
+    ]
+    recipes = find_recipes(words, page.rect.width)
+    groups = remove_recipe_lines(text_lines(page, TEXT_FLAGS, textpage), recipes)
+    if textpage is not None:
+        groups = drop_ocr_noise_lines(groups)
+    paragraphs = reading_order(groups, boxes)
+    paragraphs = place_recipes(paragraphs, [(recipe, _recipe_text(recipe)) for recipe in recipes])
+    header, body, footer = split_margins(paragraphs, height)
+    return header, body, footer, recipes
+
+
 def extract_page_parts(
     page: pymupdf.Page, config: IngestConfig, boxes: list[Box] | None = None
 ) -> PageParts:
-    groups = reading_order(text_lines(page, TEXT_FLAGS), boxes)
-    header, body, footer = split_margins(groups, page.rect.height)
+    header, body, footer, recipes = read_page(page, boxes)
     used_ocr = False
     if config.ocr and _length(header, body, footer) < config.ocr_min_chars:
         try:
-            ocr_header, ocr_body, ocr_footer = ocr_page(page, config)
+            textpage = ocr_textpage(page, config)
         except OcrUnavailableError as error:
             logger.warning("Page %d: OCR skipped (%s)", page.number + 1, error)
         else:
+            ocr_header, ocr_body, ocr_footer, ocr_recipes = read_page(page, textpage=textpage)
             if _length(ocr_header, ocr_body, ocr_footer) > _length(header, body, footer):
-                header, body, footer, used_ocr = ocr_header, ocr_body, ocr_footer, True
-    body = normalize_temperatures(body)
-    text = PageText(page=page.number + 1, text=body, label=page.get_label() or None, ocr=used_ocr)
-    return PageParts(page=text, header=header, footer=footer)
+                header, body, footer, recipes = ocr_header, ocr_body, ocr_footer, ocr_recipes
+                used_ocr = True
+    number = page.number + 1
+    tables = []
+    for position, recipe in enumerate(recipes):
+        rows = [[name.upper() for name in recipe.columns]]
+        rows += [[normalize_temperatures(cell) for cell in row] for row in recipe.rows]
+        tables.append(
+            Table(page=number, index=position, rows=rows, markdown=rows_to_markdown(rows))
+        )
+    text = PageText(
+        page=number, text=normalize_temperatures(body), label=page.get_label() or None, ocr=used_ocr
+    )
+    return PageParts(page=text, header=header, footer=footer, tables=tables)
 
 
 def extract_page(page: pymupdf.Page, config: IngestConfig) -> PageText:
     return join_parts(extract_page_parts(page, config))
 
 
-def ocr_page(page: pymupdf.Page, config: IngestConfig) -> tuple[list[str], str, list[str]]:
+def ocr_textpage(page: pymupdf.Page, config: IngestConfig) -> pymupdf.TextPage:
     try:
-        textpage = page.get_textpage_ocr(
+        return page.get_textpage_ocr(
             flags=TEXT_FLAGS, language=config.ocr_languages, dpi=config.ocr_dpi, full=True
         )
     except Exception as error:
         raise OcrUnavailableError(
             f"Tesseract not available or language data missing: {error}"
         ) from error
-    groups = drop_ocr_noise_lines(text_lines(page, TEXT_FLAGS, textpage))
-    return split_margins(reading_order(groups), page.rect.height)
 
 
 def _clean_number(number: str) -> str:

@@ -20,6 +20,7 @@ mcp-book/
 │   ├── citation.py         # "Title, Chapter, p. N"
 │   ├── extract.py          # PDF → pages (text or OCR), TOC, tables, metadata
 │   ├── layout.py           # reading order: layout boxes, side-by-side columns
+│   ├── recipes.py          # recipe tables (INGREDIENT / QUANTITY / SCALING)
 │   ├── margins.py          # running headers/footers: removed, read as chapters
 │   ├── chunking.py         # TOC-aware sections → overlapping token chunks
 │   ├── embeddings.py       # embedding backends (sentence-transformers, hash, none)
@@ -60,6 +61,11 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
    The outline (TOC) gives chapters and sections; printed page labels are kept
    when the PDF has them.
    Tables come from pdfplumber, stored as rows (JSON) and as Markdown.
+   Recipe tables (`recipes.py`): a header row with INGREDIENT, QUANTITY, SCALING
+   and PROCEDURE fixes the column bounds; rows are anchored on quantity or
+   percentage cells, lines without one continue the row above. The table is
+   stored as a table and replaces its lines in the page text as Markdown,
+   followed by the procedure.
    Running heads (`margins.py`): lines in the outer 5% of the page that repeat on
    3+ pages, after folding OCR variants ("VOlUME", "GEL 5"), are removed with the
    page numbers. Without an outline they also give the chapters: a repeated line
@@ -113,7 +119,8 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
   page and when they repeat on at least 3 pages.
 - Reading order relies on the layout analyzer's boxes and on side-by-side line
   detection; captions next to a column can still land inside the column's text.
-  Tables are kept in the order of the PDF.
+  Tables other than recipe tables are kept in the order of the PDF; pdfplumber
+  finds only tables with ruled lines, which scanned books do not have.
 - Without a PDF outline and without running heads there are no chapters: chunks
   are split by size only. Chapters read from running heads have no sections.
 - Token counts fall back to a characters/4 estimate when no tokenizer is loaded.

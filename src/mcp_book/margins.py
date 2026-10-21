@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
 from difflib import SequenceMatcher
 
-from mcp_book.models import PageText, TocEntry
+from mcp_book.models import PageText, Table, TocEntry
 
 NON_LETTERS = re.compile(r"[\W\d_]+")
 MINIMUM_KEY_LETTERS = 3
@@ -18,6 +18,7 @@ class PageParts:
     page: PageText
     header: list[str] = field(default_factory=list)
     footer: list[str] = field(default_factory=list)
+    tables: list[Table] = field(default_factory=list)
 
 
 def running_key(line: str) -> str:

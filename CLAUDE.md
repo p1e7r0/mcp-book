@@ -18,7 +18,8 @@ Rispondi all'utente in italiano. Codice, identificatori, commenti e commit in in
 ## Struttura
 `src/mcp_book/`: `config` (config.toml rigido, chiavi sconosciute = errore) · `models` ·
 `citation` · `extract` (PyMuPDF, OCR Tesseract, TOC, tabelle pdfplumber) · `layout`
-(ordine di lettura: riquadri del layout analyzer, colonne affiancate) · `margins`
+(ordine di lettura: riquadri del layout analyzer, colonne affiancate) · `recipes`
+(tabelle INGREDIENT/QUANTITY/SCALING ricostruite per righe) · `margins`
 (intestazioni e piè di pagina ripetuti: rimossi e, senza TOC, usati come capitoli) · `chunking`
 (sezioni dal TOC, chunk con overlap) · `embeddings` (sentence-transformers, `hash` per i
 test, `none`) · `store` (unico SQLite: tabelle, FTS5, vec0) · `search` (BM25 + KNN, RRF) ·

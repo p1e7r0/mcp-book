@@ -17,11 +17,12 @@ embedding multilingue locale, Tesseract per le pagine scansionate.
 ### Come funziona
 
 - **Ingestione**: testo per pagina con PyMuPDF; OCR Tesseract (`ita+eng`) sulle
-  pagine senza testo; tabelle con pdfplumber (salvate come righe e Markdown);
-  intestazioni, piè di pagina e numeri di pagina ripetuti rimossi; capitoli e
-  sezioni dal sommario del PDF o, se manca, dai piè di pagina ripetuti; chunk da
-  ~650 token (max 800) con 100 di sovrapposizione, che non attraversano i confini
-  di sezione.
+  pagine senza testo; tabelle con pdfplumber e tabelle delle ricette
+  (INGREDIENT / QUANTITY / SCALING) ricostruite riga per riga, salvate come righe
+  e Markdown; intestazioni, piè di pagina e numeri di pagina ripetuti rimossi;
+  capitoli e sezioni dal sommario del PDF o, se manca, dai piè di pagina ripetuti;
+  chunk da ~650 token (max 800) con 100 di sovrapposizione, che non attraversano i
+  confini di sezione.
 - **Ricerca ibrida**: BM25 (SQLite FTS5) + similarità semantica (`BAAI/bge-m3`,
   sqlite-vec), unite con reciprocal rank fusion.
 - **Incrementale**: un PDF non modificato non viene rielaborato.
@@ -312,7 +313,7 @@ Per stdio (Claude Desktop): `"command": "docker", "args": ["run", "-i", "--rm",
 | `search(query, book_ids?, top_k=8)` | estratto, libro, capitolo, sezione, pagine, `chunk_id`, punteggio |
 | `read_pages(book_id, start_page, end_page)` | testo completo, max 10 pagine; oltre restituisce `truncated` e `next_start_page` |
 | `read_chunk(chunk_id, context=1)` | il chunk e i vicini (0-5 per lato) |
-| `get_tables(book_id, page)` | tabelle della pagina in Markdown |
+| `get_tables(book_id, page)` | tabelle della pagina in Markdown, comprese quelle delle ricette |
 
 Ogni risposta (o ogni elemento, per gli elenchi) ha un campo `citation`. Le pagine
 negli argomenti sono indici del PDF a partire da 1; `page_label` è il numero
@@ -357,10 +358,11 @@ multilingual embedding model, Tesseract for scanned pages.
 ### How it works
 
 - **Ingestion**: per-page text with PyMuPDF; Tesseract OCR (`ita+eng`) on pages
-  without text; tables via pdfplumber (stored as rows and Markdown); repeated
-  running heads and page numbers removed; chapters and sections from the PDF
-  outline or, when there is none, from repeated running heads; ~650-token chunks
-  (max 800) with 100 tokens of overlap that never cross a section boundary.
+  without text; tables via pdfplumber, plus recipe tables (INGREDIENT / QUANTITY /
+  SCALING) rebuilt row by row, stored as rows and Markdown; repeated running heads
+  and page numbers removed; chapters and sections from the PDF outline or, when
+  there is none, from repeated running heads; ~650-token chunks (max 800) with 100
+  tokens of overlap that never cross a section boundary.
 - **Hybrid search**: BM25 (SQLite FTS5) + semantic similarity (`BAAI/bge-m3`,
   sqlite-vec), merged with reciprocal rank fusion.
 - **Incremental**: unchanged PDFs are not processed again.
