@@ -85,7 +85,9 @@ uv run mcp-book search "perché la maionese impazzisce"  # prova una ricerca
 
 - La prima volta scarica il modello `BAAI/bge-m3` (circa 2,3 GB, in
   `~/.cache/huggingface`).
-- Le pagine scansionate passano per l'OCR, che è la parte più lenta.
+- Le pagine scansionate passano per l'OCR, che è la parte più lenta: su un M3 Max
+  circa 1,6 s a pagina, quindi un volume di 500 pagine con 200 pagine scansionate
+  richiede circa 6 minuti, contro uno se il PDF ha già il testo.
 - Se macOS chiede al Terminale l'accesso a Documenti o Scrivania, consenti.
 - Quando aggiungi libri rilancia `uv run mcp-book ingest`: elabora solo i file
   nuovi o modificati.
@@ -121,14 +123,22 @@ Negli esempi seguenti sostituisci `/Users/TUO_NOME` con il risultato di `echo $H
    ```
 
 3. Salva e avvia il server: Cmd+Shift+P › **MCP: List Servers** › mcp-book ›
-   **Start Server**. Al primo avvio VS Code chiede se ti fidi del server: conferma.
-4. Apri la chat di Copilot, scegli la modalità **Agent**, apri il selettore degli
-   strumenti e controlla che i sei strumenti di mcp-book siano attivi.
+   **Start Server**. Con la configurazione utente, al primo avvio VS Code può
+   chiedere se ti fidi del server: conferma. Con `.vscode/mcp.json` in un
+   workspace già attendibile non lo chiede.
+4. Nella chat scegli **Agent** nel selettore degli agenti, poi apri **Configure
+   Tools** (oppure Cmd+Shift+P › **Chat: Open Customizations** › scheda **Tools**)
+   e controlla che i sei strumenti di mcp-book siano attivi.
 5. Chiedi, per esempio: «Cerca nei miei libri a che temperatura cuoce il salmone
    sottovuoto e cita la fonte.»
 
 Se qualcosa non va, **MCP: List Servers** › mcp-book › **Show Output** mostra i
 log del server.
+
+Il percorso guidato **MCP: Add Server** propone invece di salvare in
+`~/.copilot/mcp-config.json`, che usa la chiave `mcpServers` al posto di `servers`
+e indica il `mcp.json` del profilo come deprecato. Entrambi funzionano: se scegli
+quel file, usa lo stesso blocco con `"mcpServers"`.
 
 #### 6b. VS Code con l'estensione Claude Code
 
@@ -143,7 +153,9 @@ claude mcp list            # mcp-book deve risultare connesso
 ```
 
 `--scope user` lo rende disponibile in tutti i progetti. Poi, nel pannello di
-Claude Code, chiedi di cercare nei tuoi libri.
+Claude Code, apri una nuova conversazione (le modifiche valgono per le
+conversazioni successive), scrivi `/mcp` per controllare che mcp-book sia
+**Connected** e chiedi di cercare nei tuoi libri.
 
 #### 6c. Claude Desktop
 
@@ -383,9 +395,12 @@ Configuration** (or `.vscode/mcp.json` for one project), then:
 }
 ```
 
-Start it from **MCP: List Servers** › mcp-book › **Start Server**, trust it, then
-enable its tools in Copilot Chat's **Agent** mode. **Show Output** in the same menu
-shows the server logs.
+Start it from **MCP: List Servers** › mcp-book › **Start Server** and trust it if
+asked (a workspace `.vscode/mcp.json` in a trusted workspace does not ask). In chat,
+pick **Agent** in the agent picker and enable the tools from **Configure Tools** (or
+**Chat: Open Customizations** › **Tools**). **Show Output** in the same menu shows
+the server logs. The guided **MCP: Add Server** flow saves to
+`~/.copilot/mcp-config.json` instead, which uses `mcpServers` rather than `servers`.
 
 **VS Code + Claude Code extension**: it shares the CLI's MCP config. In the
 integrated terminal:
@@ -395,6 +410,8 @@ claude mcp add --scope user mcp-book -- \
   /opt/homebrew/bin/uv --directory /Users/YOUR_NAME/mcp-book run mcp-book serve
 claude mcp list
 ```
+
+Then start a new conversation in the Claude Code panel and check `/mcp`.
 
 Troubleshooting: `spawn uv ENOENT` → use uv's absolute path; `mps` errors → set
 `device = "cpu"` or run with `PYTORCH_ENABLE_MPS_FALLBACK=1`; `sqlite-vec
