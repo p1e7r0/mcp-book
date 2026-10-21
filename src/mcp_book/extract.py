@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 TEXT_FLAGS = pymupdf.TEXT_DEHYPHENATE | pymupdf.TEXT_PRESERVE_WHITESPACE
 JUNK_TITLE = re.compile(r"^(untitled|microsoft word\b|document\d*$)|\.(docx?|indd|pdf)$", re.I)
+HYPHENATED_LINE_END = re.compile(r"(?<=[^\W\d_])[-\u00ad\u2010]$")
 
 
 class OcrUnavailableError(RuntimeError):
@@ -54,13 +55,23 @@ def read_toc(document: pymupdf.Document) -> list[TocEntry]:
     return entries
 
 
+def join_lines(lines: list[str]) -> str:
+    text = ""
+    for line in lines:
+        if text and HYPHENATED_LINE_END.search(text) and line[:1].islower():
+            text = text[:-1] + line
+        else:
+            text = f"{text}\n{line}" if text else line
+    return text
+
+
 def _blocks_to_text(blocks: list[tuple]) -> str:
     paragraphs = []
     for block in blocks:
         if block[6] != 0:
             continue
         lines = [line.rstrip() for line in block[4].splitlines()]
-        paragraph = "\n".join(line for line in lines if line.strip())
+        paragraph = join_lines([line for line in lines if line.strip()])
         if paragraph:
             paragraphs.append(paragraph)
     return "\n\n".join(paragraphs)

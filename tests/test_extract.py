@@ -1,7 +1,9 @@
 from pathlib import Path
 
+import pymupdf
+
 from mcp_book.config import IngestConfig
-from mcp_book.extract import extract_book, rows_to_markdown
+from mcp_book.extract import extract_book, extract_page, join_lines, rows_to_markdown
 
 from conftest import requires_tesseract
 from sample_pdf import AUTHOR, TITLE, build_sample_pdf
@@ -55,6 +57,24 @@ def test_sidecar_overrides_metadata(tmp_path: Path) -> None:
 
     assert book.metadata.title == "Titolo corretto"
     assert book.metadata.author == "Anna Bianchi"
+
+
+def test_line_end_hyphenation_is_joined(tmp_path: Path) -> None:
+    document = pymupdf.open()
+    page = document.new_page(width=595, height=842)
+    page.insert_text(
+        (60, 70), "La tempera-\ntura del forno sotto-\nvuoto e il sous-\nVide", fontsize=11
+    )
+
+    text = extract_page(page, IngestConfig(ocr=False)).text
+
+    assert text == "La temperatura del forno sottovuoto e il sous-\nVide"
+
+
+def test_join_lines_keeps_inner_hyphens_and_numbers() -> None:
+    assert join_lines(["un risultato real-world e 20-", "30 min"]) == (
+        "un risultato real-world e 20-\n30 min"
+    )
 
 
 def test_markdown_escapes_pipes() -> None:
