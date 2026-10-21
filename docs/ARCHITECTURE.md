@@ -19,6 +19,7 @@ mcp-book/
 │   ├── models.py           # dataclasses shared by every stage
 │   ├── citation.py         # "Title, Chapter, p. N"
 │   ├── extract.py          # PDF → pages (text or OCR), TOC, tables, metadata
+│   ├── margins.py          # running headers/footers: removed, read as chapters
 │   ├── chunking.py         # TOC-aware sections → overlapping token chunks
 │   ├── embeddings.py       # embedding backends (sentence-transformers, hash, none)
 │   ├── store.py            # SQLite schema: books, toc, pages, tables, chunks, FTS5, vec0
@@ -51,6 +52,11 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
    mostly not words (Tesseract reading a photo) are dropped. The outline (TOC)
    gives chapters and sections; printed page labels are kept when the PDF has them.
    Tables come from pdfplumber, stored as rows (JSON) and as Markdown.
+   Running heads (`margins.py`): lines in the outer 5% of the page that repeat on
+   3+ pages, after folding OCR variants ("VOlUME", "GEL 5"), are removed with the
+   page numbers. Without an outline they also give the chapters: a repeated line
+   whose page span overlaps two or more others is the book title, the remaining
+   ones are chapters starting where they first appear.
 2. **Chunk** (`chunking.py`): the TOC splits the book into sections, refined
    inside a page when the heading text is found there. Sections are hard
    boundaries; inside a section, paragraphs (sentences when a paragraph is too
@@ -94,8 +100,10 @@ PDF ──extract──▶ pages + TOC + tables ──chunking──▶ chunks �
 
 ## Known limits
 
-- Running headers and footers are not stripped and end up in the text.
+- Running headers and footers are recognised only inside the outer 5% of the
+  page and when they repeat on at least 3 pages.
 - Multi-column layouts follow PyMuPDF's block order, which is usually but not
   always the reading order.
-- Without a PDF outline there are no chapters: chunks are split by size only.
+- Without a PDF outline and without running heads there are no chapters: chunks
+  are split by size only. Chapters read from running heads have no sections.
 - Token counts fall back to a characters/4 estimate when no tokenizer is loaded.

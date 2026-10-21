@@ -18,8 +18,10 @@ embedding multilingue locale, Tesseract per le pagine scansionate.
 
 - **Ingestione**: testo per pagina con PyMuPDF; OCR Tesseract (`ita+eng`) sulle
   pagine senza testo; tabelle con pdfplumber (salvate come righe e Markdown);
-  capitoli e sezioni dal sommario del PDF; chunk da ~650 token (max 800) con 100 di
-  sovrapposizione, che non attraversano i confini di sezione.
+  intestazioni, piè di pagina e numeri di pagina ripetuti rimossi; capitoli e
+  sezioni dal sommario del PDF o, se manca, dai piè di pagina ripetuti; chunk da
+  ~650 token (max 800) con 100 di sovrapposizione, che non attraversano i confini
+  di sezione.
 - **Ricerca ibrida**: BM25 (SQLite FTS5) + similarità semantica (`BAAI/bge-m3`,
   sqlite-vec), unite con reciprocal rank fusion.
 - **Incrementale**: un PDF non modificato non viene rielaborato.
@@ -354,9 +356,10 @@ multilingual embedding model, Tesseract for scanned pages.
 ### How it works
 
 - **Ingestion**: per-page text with PyMuPDF; Tesseract OCR (`ita+eng`) on pages
-  without text; tables via pdfplumber (stored as rows and Markdown); chapters and
-  sections from the PDF outline; ~650-token chunks (max 800) with 100 tokens of
-  overlap that never cross a section boundary.
+  without text; tables via pdfplumber (stored as rows and Markdown); repeated
+  running heads and page numbers removed; chapters and sections from the PDF
+  outline or, when there is none, from repeated running heads; ~650-token chunks
+  (max 800) with 100 tokens of overlap that never cross a section boundary.
 - **Hybrid search**: BM25 (SQLite FTS5) + semantic similarity (`BAAI/bge-m3`,
   sqlite-vec), merged with reciprocal rank fusion.
 - **Incremental**: unchanged PDFs are not processed again.

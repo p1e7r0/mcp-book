@@ -8,6 +8,7 @@ from pathlib import Path
 import pymupdf
 
 from mcp_book.config import IngestConfig
+from mcp_book.margins import PageParts, join_parts, remove_running_lines
 from mcp_book.models import BookMetadata, ExtractedBook, PageText, Table, TocEntry
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ HYPHENATED_LINE_END = re.compile(r"(?<=[^\W\d_])[-\u00ad\u2010]$")
 PAGE_LABEL_TITLE = re.compile(r"^(\d+|[ivxlcdm]+)$", re.I)
 OCR_WORD = re.compile(r"[^\W\d_]{3,}")
 OCR_QUANTITY = re.compile(r"^[-—]?\d+(?:[.,·]\d+)?\s?(?:%|°[CF]|[a-z]{1,3})?$")
+MARGIN = 0.05
 
 
 class OcrUnavailableError(RuntimeError):
@@ -32,9 +34,13 @@ def extract_book(path: Path, config: IngestConfig) -> ExtractedBook:
         if labels:
             logger.info("%s: the outline holds page numbers, not chapters", path.name)
             toc = []
-        pages = [extract_page(page, config) for page in document]
-    for page in pages:
-        page.label = page.label or labels.get(page.page)
+        parts = [extract_page_parts(page, config) for page in document]
+    for part in parts:
+        part.page.label = part.page.label or labels.get(part.page.page)
+    pages, running_chapters = remove_running_lines(parts)
+    if not toc and running_chapters:
+        logger.info("%s: %d chapters read from running heads", path.name, len(running_chapters))
+        toc = running_chapters
     tables = extract_tables(path) if config.extract_tables else []
     return ExtractedBook(metadata=metadata, pages=pages, toc=toc, tables=tables)
 
@@ -99,21 +105,50 @@ def _blocks_to_text(blocks: list[tuple]) -> str:
     return "\n\n".join(paragraphs)
 
 
-def extract_page(page: pymupdf.Page, config: IngestConfig) -> PageText:
-    text = _blocks_to_text(page.get_text("blocks", flags=TEXT_FLAGS))
+def _block_lines(blocks: list[tuple]) -> list[str]:
+    return [line.strip() for block in blocks for line in block[4].splitlines() if line.strip()]
+
+
+def split_margins(blocks: list[tuple], height: float) -> tuple[list[str], str, list[str]]:
+    header, body, footer = [], [], []
+    for block in blocks:
+        if block[6] != 0:
+            continue
+        if block[3] <= MARGIN * height:
+            header.append(block)
+        elif block[1] >= (1 - MARGIN) * height:
+            footer.append(block)
+        else:
+            body.append(block)
+    return _block_lines(header), _blocks_to_text(body), _block_lines(footer)
+
+
+def _length(header: list[str], body: str, footer: list[str]) -> int:
+    return len(body.strip()) + sum(len(line) for line in header + footer)
+
+
+def extract_page_parts(page: pymupdf.Page, config: IngestConfig) -> PageParts:
+    header, body, footer = split_margins(
+        page.get_text("blocks", flags=TEXT_FLAGS), page.rect.height
+    )
     used_ocr = False
-    if config.ocr and len(text.strip()) < config.ocr_min_chars:
+    if config.ocr and _length(header, body, footer) < config.ocr_min_chars:
         try:
-            ocr_text = ocr_page(page, config)
+            ocr_header, ocr_body, ocr_footer = ocr_page(page, config)
         except OcrUnavailableError as error:
             logger.warning("Page %d: OCR skipped (%s)", page.number + 1, error)
         else:
-            if len(ocr_text.strip()) > len(text.strip()):
-                text, used_ocr = ocr_text, True
-    return PageText(page=page.number + 1, text=text, label=page.get_label() or None, ocr=used_ocr)
+            if _length(ocr_header, ocr_body, ocr_footer) > _length(header, body, footer):
+                header, body, footer, used_ocr = ocr_header, ocr_body, ocr_footer, True
+    text = PageText(page=page.number + 1, text=body, label=page.get_label() or None, ocr=used_ocr)
+    return PageParts(page=text, header=header, footer=footer)
 
 
-def ocr_page(page: pymupdf.Page, config: IngestConfig) -> str:
+def extract_page(page: pymupdf.Page, config: IngestConfig) -> PageText:
+    return join_parts(extract_page_parts(page, config))
+
+
+def ocr_page(page: pymupdf.Page, config: IngestConfig) -> tuple[list[str], str, list[str]]:
     try:
         textpage = page.get_textpage_ocr(
             flags=TEXT_FLAGS, language=config.ocr_languages, dpi=config.ocr_dpi, full=True
@@ -122,8 +157,12 @@ def ocr_page(page: pymupdf.Page, config: IngestConfig) -> str:
         raise OcrUnavailableError(
             f"Tesseract not available or language data missing: {error}"
         ) from error
-    return drop_ocr_noise(
-        _blocks_to_text(page.get_text("blocks", textpage=textpage, flags=TEXT_FLAGS))
+    blocks = page.get_text("blocks", textpage=textpage, flags=TEXT_FLAGS)
+    header, body, footer = split_margins(blocks, page.rect.height)
+    return (
+        drop_ocr_noise("\n".join(header)).splitlines(),
+        drop_ocr_noise(body),
+        drop_ocr_noise("\n".join(footer)).splitlines(),
     )
 
 
