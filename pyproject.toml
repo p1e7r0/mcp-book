@@ -32,6 +32,7 @@ packages = ["src/mcp_book"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+pythonpath = ["tests"]
 
 [tool.ruff]
 line-length = 100
@@ -39,3 +40,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mcp_book"]
+known-local-folder = ["conftest", "sample_pdf"]
